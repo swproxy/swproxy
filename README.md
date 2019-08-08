@@ -4,6 +4,9 @@ Yet another summoners war exporter!
 ## Download
 Binary release: https://github.com/swproxy/swproxy/releases
 
+## Issues
+* Install vcredist in zip if you cannot execute swproxy.exe
+
 ## Usage
 
 1. Open swproxy.exe
@@ -16,6 +19,9 @@ Binary release: https://github.com/swproxy/swproxy/releases
 ## Note
 * Step 2 and 3 only needed once.
 * Do NOT forget typing in 'http://' in step2 otherwise it won't work
+
+## Changelog
+* v0.2 Add openssl auto install
  
 ## Reference
 * https://github.com/inaz2/proxy2
