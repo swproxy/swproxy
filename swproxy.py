@@ -133,9 +133,9 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 startupinfo.dwFlags |= STARTF_USESHOWWINDOW
 
                 epoch = "%d" % (time.time() * 1000)
-                p1 = Popen(["openssl", "req", "-new", "-key", self.certkey, "-subj", "/CN=%s" % hostname], stdout=PIPE,
+                p1 = Popen(["openssl\\bin\\openssl.exe", "req", "-new", "-key", self.certkey, "-subj", "/CN=%s" % hostname], stdout=PIPE,
                            startupinfo=startupinfo)
-                p2 = Popen(["openssl", "x509", "-req", "-days", "3650", "-CA", self.cacert, "-CAkey", self.cakey,
+                p2 = Popen(["openssl\\bin\\openssl.exe", "x509", "-req", "-days", "3650", "-CA", self.cacert, "-CAkey", self.cakey,
                             "-set_serial", epoch, "-out", certpath], stdin=p1.stdout, stderr=PIPE,
                            startupinfo=startupinfo)
                 p2.communicate()
@@ -376,9 +376,11 @@ class SWHandler(ProxyRequestHandler):
 
 def run_proxy(HandlerClass=ProxyRequestHandler, ServerClass=ThreadingHTTPServer, protocol="HTTP/1.1", ip='0.0.0.0',
               port=8899):
-    print('Welcome to Summoners War Proxy 0.1!')
+    print('Welcome to Summoners War Proxy 0.2!')
     print('Yet another exporter!')
     print('Author: @swproxy(https://github.com/swproxy)\n\n')
+
+    check_openssl()
 
     if os.path.isdir('certs'):
         for file in os.listdir('certs'):
@@ -399,6 +401,13 @@ def run_proxy(HandlerClass=ProxyRequestHandler, ServerClass=ThreadingHTTPServer,
           'Note: Step 2 and 3 only needed once.\n')
 
     httpd.serve_forever()
+
+
+def check_openssl():
+    if os.path.isdir('openssl'):
+        return
+    print('Installing openssl...')
+    Popen(['Win32OpenSSL_Light-1_1_1c.exe', '/VERYSILENT', '/DIR=openssl'], shell=True)
 
 
 if __name__ == '__main__':
