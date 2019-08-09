@@ -21,6 +21,7 @@ Binary release: https://github.com/swproxy/swproxy/releases
 * Do NOT forget typing in 'http://' in step2 otherwise it won't work
 
 ## Changelog
+* v0.3 Completely abandon openssl stuff.
 * v0.2 Add openssl auto install
  
 ## Reference
