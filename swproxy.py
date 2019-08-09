@@ -17,6 +17,12 @@ from socketserver import ThreadingMixIn
 from subprocess import Popen, PIPE, STARTUPINFO, STARTF_USESHOWWINDOW
 from collections import deque
 from Crypto.Cipher import AES
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+import datetime
+from cryptography import x509
+from cryptography.x509.oid import NameOID
+from cryptography.hazmat.primitives import hashes
 from random import randint
 import zlib, base64
 
@@ -40,31 +46,44 @@ def _decrypt(msg, version=1):
     return unpad(r)
 
 
-def _encrypt(msg, version=1):
-    if version == 1:
-        key = 'E2wN5Eo0t4gle92Z'
-    elif version == 2:
-        key = 'Gr4S2eiNl7zq5MrU'
-    else:
-        raise ValueError('Unknow Version')
-
-    msg = pad(msg)
-    obj = AES.new(key.encode(), AES.MODE_CBC,
-                  '\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'.encode())
-    r = obj.encrypt(msg.encode())
-    return r
-
-
 def decrypt_request(msg, version=2):
     return _decrypt(base64.b64decode(msg), version)
 
 
-def encrypt_request(msg, version=2):
-    return base64.b64encode(_encrypt(msg, version))
-
-
 def decrypt_response(msg, version=2):
     return zlib.decompress(_decrypt(base64.b64decode(msg), version))
+
+
+def cert_generate(cakey, certkey, path, domain):
+    with open(certkey, 'rb') as f:
+        certkey = serialization.load_pem_private_key(f.read(), None, default_backend())
+    with open(cakey, 'rb') as f:
+        key = serialization.load_pem_private_key(f.read(), None, default_backend())
+
+    issuer = x509.Name([
+        x509.NameAttribute(NameOID.COMMON_NAME, u"SW Proxy"),
+    ])
+    subject = x509.Name([
+        x509.NameAttribute(NameOID.COMMON_NAME, domain),
+    ])
+    cert = x509.CertificateBuilder().subject_name(
+        subject
+    ).issuer_name(
+        issuer
+    ).public_key(
+        certkey.public_key()
+    ).serial_number(
+
+        x509.random_serial_number()
+    ).not_valid_before(
+
+        datetime.datetime.utcnow()
+    ).not_valid_after(
+        # Our certificate will be valid for 10 days
+        datetime.datetime.utcnow() + datetime.timedelta(days=1000)
+    ).sign(key, hashes.SHA256(), default_backend())
+    with open(path, "wb") as f:
+        f.write(cert.public_bytes(serialization.Encoding.PEM))
 
 
 def with_color(c, s):
@@ -132,18 +151,16 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 startupinfo = STARTUPINFO()
                 startupinfo.dwFlags |= STARTF_USESHOWWINDOW
 
-                epoch = "%d" % (time.time() * 1000)
-                p1 = Popen(["openssl\\bin\\openssl.exe", "req", "-new", "-key", self.certkey, "-subj", "/CN=%s" % hostname], stdout=PIPE,
-                           startupinfo=startupinfo)
-                p2 = Popen(["openssl\\bin\\openssl.exe", "x509", "-req", "-days", "3650", "-CA", self.cacert, "-CAkey", self.cakey,
-                            "-set_serial", epoch, "-out", certpath], stdin=p1.stdout, stderr=PIPE,
-                           startupinfo=startupinfo)
-                p2.communicate()
+                cert_generate(self.cakey, self.certkey, certpath, hostname)
 
         self.wfile.write("{} {} {}\r\n".format(self.protocol_version, 200, 'Connection Established').encode())
         self.end_headers()
 
-        self.connection = ssl.wrap_socket(self.connection, keyfile=self.certkey, certfile=certpath, server_side=True)
+        try:
+            self.connection = ssl.wrap_socket(self.connection, keyfile=self.certkey, certfile=certpath, server_side=True)
+        except Exception as e:
+            print(e)
+
         self.rfile = self.connection.makefile("rb", self.rbufsize)
         self.wfile = self.connection.makefile("wb", self.wbufsize)
 
@@ -376,11 +393,9 @@ class SWHandler(ProxyRequestHandler):
 
 def run_proxy(HandlerClass=ProxyRequestHandler, ServerClass=ThreadingHTTPServer, protocol="HTTP/1.1", ip='0.0.0.0',
               port=8899):
-    print('Welcome to Summoners War Proxy 0.2!')
+    print('Welcome to Summoners War Proxy 0.3!')
     print('Yet another exporter!')
     print('Author: @swproxy(https://github.com/swproxy)\n\n')
-
-    check_openssl()
 
     if os.path.isdir('certs'):
         for file in os.listdir('certs'):
@@ -393,7 +408,7 @@ def run_proxy(HandlerClass=ProxyRequestHandler, ServerClass=ThreadingHTTPServer,
     httpd = ServerClass(server_address, HandlerClass)
 
     sa = httpd.socket.getsockname()
-    print("Serving proxy on", sa[0], "port", sa[1], "...")
+    print("Serving proxy on", sa[0], "port", sa[1], "")
     print('1. Set proxy on your phone\n'
           '2. Open http://cert/ with default browser(Safari on iOS, haven\'t test on android)\n'
           '3. Install certificate(Important!)\n'
@@ -403,15 +418,7 @@ def run_proxy(HandlerClass=ProxyRequestHandler, ServerClass=ThreadingHTTPServer,
     httpd.serve_forever()
 
 
-def check_openssl():
-    if os.path.isdir('openssl'):
-        return
-    print('Installing openssl...')
-    Popen(['Win32OpenSSL_Light-1_1_1c.exe', '/VERYSILENT', '/DIR=openssl'], shell=True)
-
-
 if __name__ == '__main__':
-
     sys.stderr = io.BytesIO()
 
     port = randint(1024, 65535)
