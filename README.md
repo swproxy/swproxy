@@ -1,6 +1,8 @@
 # swproxy
 Yet another summoners war exporter!
 
+### Since SWEX was fixed, I may not update this anymore unless SWEX fail again.
+
 ## Download
 Binary release: https://github.com/swproxy/swproxy/releases
 
